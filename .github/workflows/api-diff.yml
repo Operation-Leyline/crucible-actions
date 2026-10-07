@@ -11,20 +11,12 @@ on:
         description: Baseline tag or commit; defaults to the PR base SHA.
         default: ''
         type: string
-      working-directory:
-        description: Service package path inside both revisions.
-        default: .
-        type: string
-      model-path:
-        description: Assembled AST path relative to working-directory.
-        default: model/model.json
-        type: string
-      build-command:
-        description: Optional model assembly command run in both revisions.
-        default: ''
+      smithy-path:
+        description: Smithy source directory relative to each checkout.
+        default: smithy
         type: string
       config-path:
-        description: Policy path relative to the proposed working-directory.
+        description: Policy path relative to the proposed checkout.
         default: crucible.toml
         type: string
       service:
@@ -69,21 +61,18 @@ jobs:
           ref: ${{ steps.baseline.outputs.ref }}
           path: baseline
           persist-credentials: false
-      - uses: Operation-Leyline/crucible-actions/setup-crucible@2daa56af9945fef2f0342acd8644d3c4e707cd96
+      - uses: Operation-Leyline/crucible-actions/setup-crucible@31cacf98b4960f90eb541b8df41a9661d2dab2a3
         id: tooling
         with:
           crucible-ref: ${{ inputs.crucible-ref }}
           token: ${{ secrets.CRUCIBLE_READ_TOKEN || github.token }}
-      - uses: Operation-Leyline/crucible-actions/api-diff@2daa56af9945fef2f0342acd8644d3c4e707cd96
+      - uses: Operation-Leyline/crucible-actions/api-diff@31cacf98b4960f90eb541b8df41a9661d2dab2a3
         id: diff
         with:
           cli: ${{ steps.tooling.outputs.cli }}
-          baseline-directory: baseline
-          proposed-directory: service
-          working-directory: ${{ inputs.working-directory }}
-          model-path: ${{ inputs.model-path }}
-          build-command: ${{ inputs.build-command }}
-          config-path: ${{ inputs.config-path }}
+          before: baseline/${{ inputs.smithy-path }}
+          after: service/${{ inputs.smithy-path }}
+          config: service/${{ inputs.config-path }}
           service: ${{ inputs.service }}
       - uses: actions/upload-artifact@v4
         if: always()
