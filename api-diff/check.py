@@ -1,13 +1,11 @@
-"""Build two service contracts, then preserve and display Crucible's diff report."""
+"""Compare two Smithy directories and preserve Crucible's compatibility report."""
 
 import argparse
 import html
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
-import tempfile
 
 
 def inside(root, relative):
@@ -19,18 +17,6 @@ def inside(root, relative):
     if not path.is_relative_to(root):
         raise ValueError(f"Path escapes checkout: {relative}")
     return path
-
-
-def prepare(root, working_directory, model_path, command, destination):
-    root = Path(root).resolve(strict=True)
-    working = inside(root, working_directory)
-    model = inside(root, str(Path(working_directory) / model_path))
-    if command:
-        environment = {**os.environ, "CRUCIBLE_MODEL_OUT": str(model), "CARGO_BUILD_JOBS": os.environ.get("CARGO_BUILD_JOBS", "2")}
-        subprocess.run(["bash", "-e", "-o", "pipefail", "-c", command], cwd=working, env=environment, check=True)
-    if not model.is_file():
-        raise ValueError(f"Missing assembled model: {model}. Supply a checked-in AST or a build-command that exports it.")
-    shutil.copyfile(model, destination)
 
 
 def markdown(report):
@@ -55,19 +41,19 @@ def run(args):
             raise ValueError("report-path cannot contain line breaks")
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
             output.write(f"report-path={report_path}\n")
-    proposed = Path(args.proposed).resolve(strict=True)
-    config = inside(proposed, str(Path(args.working_directory) / args.config_path))
+    workspace = Path(os.environ.get("GITHUB_WORKSPACE", os.getcwd())).resolve(strict=True)
+    before = inside(workspace, args.before)
+    after = inside(workspace, args.after)
+    for path in (before, after):
+        if not path.is_dir() and not path.is_file():
+            raise ValueError(f"Missing Smithy directory or JSON model: {path}")
+    config = inside(workspace, args.config)
     if not config.is_file():
         raise ValueError(f"Missing policy: {config}")
-    with tempfile.TemporaryDirectory(prefix="crucible-diff-") as temporary:
-        baseline = Path(temporary) / "baseline.json"
-        proposed_model = Path(temporary) / "proposed.json"
-        prepare(args.baseline, args.working_directory, args.model_path, args.build_command, baseline)
-        prepare(args.proposed, args.working_directory, args.model_path, args.build_command, proposed_model)
-        command = [args.cli, "diff", str(baseline), str(proposed_model), "--config", str(config), "--json"]
-        if args.service:
-            command += ["--service", args.service]
-        result = subprocess.run(command, text=True, capture_output=True, check=False)
+    command = [args.cli, "diff", str(before), str(after), "--config", str(config), "--json"]
+    if args.service:
+        command += ["--service", args.service]
+    result = subprocess.run(command, text=True, capture_output=True, check=False)
     (report_path / "checker.log").write_text(result.stderr, encoding="utf-8")
     try:
         report = json.loads(result.stdout)
@@ -87,12 +73,9 @@ def run(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("cli", "baseline", "proposed"):
+    for name in ("cli", "before", "after"):
         parser.add_argument("--" + name, required=True)
-    parser.add_argument("--working-directory", default=".")
-    parser.add_argument("--model-path", default="model/model.json")
-    parser.add_argument("--build-command", default="")
-    parser.add_argument("--config-path", default="crucible.toml")
+    parser.add_argument("--config", default="crucible.toml")
     parser.add_argument("--service", default="")
     parser.add_argument("--report-path", default="api-diff-report")
     args = parser.parse_args()
@@ -101,7 +84,7 @@ def main():
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         report_path = Path(args.report_path)
         report_path.mkdir(parents=True, exist_ok=True)
-        # A setup/build failure remains a failure and leaves an artifact for diagnosis.
+        # Assembly failures remain failures and leave an artifact for diagnosis.
         (report_path / "failure.txt").write_text(str(error), encoding="utf-8")
         parser.exit(1, f"API compatibility check failed: {error}\n")
 

@@ -1,26 +1,17 @@
 name: Check Crucible API compatibility
-description: Compare two assembled Smithy models using a pinned Crucible checker.
+description: Assemble and compare two Smithy source directories using a pinned Crucible checker.
 inputs:
   cli:
     description: Absolute path to the Crucible executable.
     required: true
-  baseline-directory:
-    description: Checkout containing the baseline service.
+  before:
+    description: Baseline Smithy directory (or JSON AST), relative to the workspace.
     required: true
-  proposed-directory:
-    description: Checkout containing the proposed service.
+  after:
+    description: Proposed Smithy directory (or JSON AST), relative to the workspace.
     required: true
-  working-directory:
-    description: Service package path inside each checkout.
-    default: .
-  model-path:
-    description: AST path relative to the service working directory.
-    default: model/model.json
-  build-command:
-    description: Optional command run in both revisions to assemble/export their model.
-    default: ''
-  config-path:
-    description: Policy path relative to the proposed service working directory.
+  config:
+    description: Compatibility policy path, relative to the workspace.
     default: crucible.toml
   service:
     description: Absolute Smithy service ID when the model contains several services.
@@ -40,17 +31,12 @@ runs:
       env:
         ACTION_PATH: ${{ github.action_path }}
         CLI: ${{ inputs.cli }}
-        BASELINE: ${{ inputs.baseline-directory }}
-        PROPOSED: ${{ inputs.proposed-directory }}
-        WORKING_DIRECTORY: ${{ inputs.working-directory }}
-        MODEL_PATH: ${{ inputs.model-path }}
-        BUILD_COMMAND: ${{ inputs.build-command }}
-        CONFIG_PATH: ${{ inputs.config-path }}
+        BEFORE: ${{ inputs.before }}
+        AFTER: ${{ inputs.after }}
+        CONFIG: ${{ inputs.config }}
         SERVICE: ${{ inputs.service }}
         REPORT_PATH: ${{ inputs.report-path }}
       run: |
         python3 "$ACTION_PATH/check.py" \
-          --cli "$CLI" --baseline "$BASELINE" --proposed "$PROPOSED" \
-          --working-directory "$WORKING_DIRECTORY" --model-path "$MODEL_PATH" \
-          --build-command "$BUILD_COMMAND" --config-path "$CONFIG_PATH" \
+          --cli "$CLI" --before "$BEFORE" --after "$AFTER" --config "$CONFIG" \
           --service "$SERVICE" --report-path "$REPORT_PATH"
