@@ -1,0 +1,93 @@
+name: Crucible API compatibility
+
+on:
+  workflow_call:
+    inputs:
+      crucible-ref:
+        description: Immutable checker commit or release tag containing crucible diff.
+        required: true
+        type: string
+      baseline-ref:
+        description: Baseline tag or commit; defaults to the PR base SHA.
+        default: ''
+        type: string
+      working-directory:
+        description: Service package path inside both revisions.
+        default: .
+        type: string
+      model-path:
+        description: Assembled AST path relative to working-directory.
+        default: model/model.json
+        type: string
+      build-command:
+        description: Optional model assembly command run in both revisions.
+        default: ''
+        type: string
+      config-path:
+        description: Policy path relative to the proposed working-directory.
+        default: crucible.toml
+        type: string
+      service:
+        description: Smithy service ID when there is more than one service.
+        default: ''
+        type: string
+    secrets:
+      CRUCIBLE_READ_TOKEN:
+        description: Read-only token with access to the private Crucible repository.
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  compatibility:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Select baseline
+        id: baseline
+        env:
+          BASELINE_REF: ${{ inputs.baseline-ref || github.event.pull_request.base.sha }}
+        run: |
+          python3 - <<'PY'
+          import os
+          value = os.environ['BASELINE_REF']
+          if not value or '\n' in value or '\r' in value:
+              raise SystemExit('Provide baseline-ref outside a pull_request event.')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'ref={value}\n')
+          PY
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: service
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ steps.baseline.outputs.ref }}
+          path: baseline
+          persist-credentials: false
+      - uses: Operation-Leyline/crucible-actions/setup-crucible@2daa56af9945fef2f0342acd8644d3c4e707cd96
+        id: tooling
+        with:
+          crucible-ref: ${{ inputs.crucible-ref }}
+          token: ${{ secrets.CRUCIBLE_READ_TOKEN || github.token }}
+      - uses: Operation-Leyline/crucible-actions/api-diff@2daa56af9945fef2f0342acd8644d3c4e707cd96
+        id: diff
+        with:
+          cli: ${{ steps.tooling.outputs.cli }}
+          baseline-directory: baseline
+          proposed-directory: service
+          working-directory: ${{ inputs.working-directory }}
+          model-path: ${{ inputs.model-path }}
+          build-command: ${{ inputs.build-command }}
+          config-path: ${{ inputs.config-path }}
+          service: ${{ inputs.service }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-diff-report
+          path: api-diff-report
+          if-no-files-found: ignore

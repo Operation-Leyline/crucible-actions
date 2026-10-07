@@ -1,0 +1,43 @@
+name: Set up Crucible
+description: Build a pinned Crucible CLI with a cached Rust toolchain and dependencies.
+inputs:
+  crucible-ref:
+    description: Immutable Crucible commit or release tag containing the policy checker.
+    required: true
+  token:
+    description: Read token for the private Crucible repository.
+    default: ${{ github.token }}
+  toolchain:
+    description: Rust toolchain used to build the checker.
+    default: stable
+outputs:
+  cli:
+    description: Absolute path to the compiled Crucible CLI.
+    value: ${{ steps.build.outputs.cli }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        repository: Operation-Leyline/crucible
+        ref: ${{ inputs.crucible-ref }}
+        token: ${{ inputs.token }}
+        path: crucible-tooling
+        persist-credentials: false
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: ${{ inputs.toolchain }}
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: crucible-tooling -> target
+    - id: build
+      shell: bash
+      run: |
+        cargo build --manifest-path "$GITHUB_WORKSPACE/crucible-tooling/Cargo.toml" \
+          --locked -p crucible-cli
+        binary=crucible
+        if [[ "$RUNNER_OS" == Windows ]]; then binary=crucible.exe; fi
+        printf 'cli=%s\n' "$GITHUB_WORKSPACE/crucible-tooling/target/debug/$binary" >> "$GITHUB_OUTPUT"
+      env:
+        CARGO_BUILD_JOBS: '2'
+        CARGO_TARGET_DIR: ${{ github.workspace }}/crucible-tooling/target
