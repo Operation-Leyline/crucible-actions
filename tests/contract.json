@@ -1,0 +1,35 @@
+{
+  "smithy": "2.0",
+  "shapes": {
+    "example.api#Catalog": {
+      "type": "service", "version": "1",
+      "operations": [{"target": "example.api#GetItem"}],
+      "traits": {"crucible.protocols#json": {}}
+    },
+    "example.api#GetItem": {
+      "type": "operation",
+      "input": {"target": "example.api#GetItemInput"},
+      "output": {"target": "example.api#GetItemOutput"},
+      "traits": {"smithy.api#http": {"method": "POST", "uri": "/v1/items", "code": 200}}
+    },
+    "example.api#GetItemInput": {
+      "type": "structure", "traits": {"smithy.api#input": {}},
+      "members": {
+        "name": {"target": "example.api#Name"},
+        "filter": {"target": "example.api#State"},
+        "node": {"target": "example.api#Node"}
+      }
+    },
+    "example.api#GetItemOutput": {
+      "type": "structure", "traits": {"smithy.api#output": {}},
+      "members": {
+        "name": {"target": "example.api#Name", "traits": {"smithy.api#required": {}}},
+        "state": {"target": "example.api#State"},
+        "node": {"target": "example.api#Node"}
+      }
+    },
+    "example.api#Name": {"type": "string", "traits": {"smithy.api#length": {"min": 1, "max": 100}}},
+    "example.api#State": {"type": "enum", "members": {"READY": {"target": "smithy.api#Unit", "traits": {"smithy.api#enumValue": "ready"}}}},
+    "example.api#Node": {"type": "structure", "members": {"next": {"target": "example.api#Node"}}}
+  }
+}
