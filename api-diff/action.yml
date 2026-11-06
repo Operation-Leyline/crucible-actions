@@ -11,8 +11,8 @@ inputs:
     description: Proposed .cru package directory, relative to the workspace.
     required: true
   config:
-    description: Compatibility policy path, relative to the workspace.
-    default: crucible.toml
+    description: Optional workspace-relative policy path; defaults to after/crucible.toml.
+    default: ''
   service:
     description: Fully qualified service ID when the package contains several services.
     default: ''

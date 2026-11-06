@@ -47,7 +47,7 @@ def run(args):
     for path in (before, after):
         if not path.is_dir() and not path.is_file():
             raise ValueError(f"Missing Crucible package: {path}")
-    config = inside(workspace, args.config)
+    config = inside(workspace, args.config) if args.config else after / "crucible.toml"
     if not config.is_file():
         raise ValueError(f"Missing policy: {config}")
     command = [args.cli, "diff", str(before), str(after), "--config", str(config), "--json"]
@@ -75,7 +75,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("cli", "before", "after"):
         parser.add_argument("--" + name, required=True)
-    parser.add_argument("--config", default="crucible.toml")
+    parser.add_argument("--config", default="")
     parser.add_argument("--service", default="")
     parser.add_argument("--report-path", default="api-diff-report")
     args = parser.parse_args()

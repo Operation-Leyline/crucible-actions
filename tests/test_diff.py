@@ -68,6 +68,8 @@ readonly operation GetItem {
                 (root / side / "api.cru").write_text(model, encoding="utf-8")
                 (root / side / "crucible.toml").write_text('schema_version = 1\n[model]\nnamespace = "example.api"\nlanguage = 1\nsources = ["."]\nimports = []\n', encoding="utf-8")
             args = self.args(root, os.environ["CRUCIBLE_CLI"])
+            # The two required package inputs also select the proposed package's policy.
+            args.config = ""
             with patch.dict(os.environ, {"GITHUB_WORKSPACE": str(root)}):
                 self.assertEqual(api_diff.run(args), 0)
                 (root / "proposed/api.cru").write_text(model.replace("/v1/items", "/v2/items"), encoding="utf-8")

@@ -68,7 +68,7 @@ Use `api-diff` when you also want a report comparing the PR base or another Git 
     config: service/model/crucible.toml
 ```
 
-Run setup first. `before` and `after` are `.cru` packages, each with its own `crucible.toml`. Paths must stay inside `GITHUB_WORKSPACE`. Optional `service` selects a fully qualified service ID. `cli` defaults to `crucible`; `report-path` defaults to `api-diff-report`.
+Run setup first. `before` and `after` are `.cru` packages, each with its own `crucible.toml`. Paths must stay inside `GITHUB_WORKSPACE`. The policy defaults to `after/crucible.toml`; set `config` only to override it with another workspace-relative file. Optional `service` selects a fully qualified service ID. `cli` defaults to `crucible`; `report-path` defaults to `api-diff-report`.
 
 The action writes JSON and Markdown reports and a job summary. Breaking findings remain failures; invalid models and setup errors never become a compatibility pass. The template uploads the reports even when comparison fails. Findings cover wire and model-level SDK compatibility, not every target language's ABI.
 
