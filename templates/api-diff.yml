@@ -1,4 +1,4 @@
-name: API compatibility
+name: API compatibility report
 
 on:
   pull_request:
@@ -11,27 +11,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      # These names match the existing crucible-ci-read App integration.
-      # Its Operation-Leyline installation must include both listed repos.
-      - name: Authenticate private tooling checkout
-        id: app-token
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
-        with:
-          app-id: ${{ vars.CRUCIBLE_APP_ID }}
-          private-key: ${{ secrets.CRUCIBLE_APP_PRIVATE_KEY }}
-          owner: Operation-Leyline
-          repositories: |
-            crucible
-            crucible-actions
-          permission-contents: read
-      - uses: actions/checkout@v4
-        with:
-          repository: Operation-Leyline/crucible-actions
-          # Pin the shared actions independently of the checker.
-          ref: 31cacf98b4960f90eb541b8df41a9661d2dab2a3
-          token: ${{ steps.app-token.outputs.token }}
-          path: crucible-actions
-          persist-credentials: false
       - uses: actions/checkout@v4
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
@@ -43,17 +22,14 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha }}
           path: baseline
           persist-credentials: false
-      - uses: ./crucible-actions/setup-crucible
-        id: tooling
+      - uses: Operation-Leyline/crucible-actions/setup-crucible@50bd6f83a989e9ebe49e6cb3a56e6f22698bd66d
         with:
-          crucible-ref: 98bf404f86f99b7b9a759ca984f3ed4e9acc5f6c
-          token: ${{ steps.app-token.outputs.token }}
-      - uses: ./crucible-actions/api-diff
+          working-directory: service
+      - uses: Operation-Leyline/crucible-actions/api-diff@50bd6f83a989e9ebe49e6cb3a56e6f22698bd66d
         with:
-          cli: ${{ steps.tooling.outputs.cli }}
-          before: baseline/smithy
-          after: service/smithy
-          config: service/crucible.toml
+          before: baseline/model
+          after: service/model
+          config: service/model/crucible.toml
       - uses: actions/upload-artifact@v4
         if: always()
         with:

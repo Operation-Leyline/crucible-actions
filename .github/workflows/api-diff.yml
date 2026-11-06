@@ -4,28 +4,32 @@ on:
   workflow_call:
     inputs:
       crucible-ref:
-        description: Immutable checker commit or release tag containing crucible diff.
-        required: true
+        description: Optional release tag or full commit; otherwise use the proposed service's Cargo.lock.
+        default: ''
         type: string
       baseline-ref:
         description: Baseline tag or commit; defaults to the PR base SHA.
         default: ''
         type: string
       smithy-path:
-        description: Smithy source directory relative to each checkout.
-        default: smithy
+        description: Deprecated alias for model-path.
+        default: ''
+        type: string
+      model-path:
+        description: .cru package directory relative to each checkout.
+        default: model
         type: string
       config-path:
         description: Policy path relative to the proposed checkout.
-        default: crucible.toml
+        default: model/crucible.toml
         type: string
       service:
-        description: Smithy service ID when there is more than one service.
+        description: Fully qualified service ID when there is more than one service.
         default: ''
         type: string
     secrets:
       CRUCIBLE_READ_TOKEN:
-        description: Read-only token with access to the private Crucible repository.
+        description: Optional API and source checkout token; public tooling needs no extra credentials.
         required: false
 
 permissions:
@@ -61,17 +65,18 @@ jobs:
           ref: ${{ steps.baseline.outputs.ref }}
           path: baseline
           persist-credentials: false
-      - uses: Operation-Leyline/crucible-actions/setup-crucible@31cacf98b4960f90eb541b8df41a9661d2dab2a3
+      - uses: Operation-Leyline/crucible-actions/setup-crucible@50bd6f83a989e9ebe49e6cb3a56e6f22698bd66d
         id: tooling
         with:
           crucible-ref: ${{ inputs.crucible-ref }}
+          working-directory: service
           token: ${{ secrets.CRUCIBLE_READ_TOKEN || github.token }}
-      - uses: Operation-Leyline/crucible-actions/api-diff@31cacf98b4960f90eb541b8df41a9661d2dab2a3
+      - uses: Operation-Leyline/crucible-actions/api-diff@50bd6f83a989e9ebe49e6cb3a56e6f22698bd66d
         id: diff
         with:
           cli: ${{ steps.tooling.outputs.cli }}
-          before: baseline/${{ inputs.smithy-path }}
-          after: service/${{ inputs.smithy-path }}
+          before: baseline/${{ inputs.smithy-path || inputs.model-path }}
+          after: service/${{ inputs.smithy-path || inputs.model-path }}
           config: service/${{ inputs.config-path }}
           service: ${{ inputs.service }}
       - uses: actions/upload-artifact@v4
