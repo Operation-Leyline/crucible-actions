@@ -25,14 +25,14 @@ class DiffTests(unittest.TestCase):
 
     def test_missing_sources_fail_instead_of_skipping(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             with patch.dict(os.environ, {"GITHUB_WORKSPACE": str(root)}, clear=True), patch.object(api_diff.subprocess, "run") as run:
                 self.assertRaises(ValueError, api_diff.run, self.args(root))
                 run.assert_not_called()
 
     def test_breaking_report_is_preserved_and_returns_the_checker_failure(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             for side in ("baseline", "proposed"):
                 (root / side).mkdir()
                 (root / side / "model.json").write_text("{}", encoding="utf-8")
@@ -62,7 +62,7 @@ readonly operation GetItem {
 }
 '''
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             for side in ("baseline", "proposed"):
                 (root / side).mkdir()
                 (root / side / "api.cru").write_text(model, encoding="utf-8")

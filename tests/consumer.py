@@ -67,7 +67,13 @@ def verify(root):
             assert request(endpoint, b'{"name":"World"}') == (200, {"message": "Hello, World!"})
             status, error = request(endpoint, b"{}")
             assert status == 400 and error["__type"] == "ValidationException", (status, error)
-            print("Fresh consumer passed: matching CLI, model check, SDK generation, HTTP 200 and modeled 400")
+            address = urlsplit(endpoint)
+            with http.client.HTTPConnection(address.hostname, address.port, timeout=10) as connection:
+                connection.request("GET", "/explorer/")
+                response = connection.getresponse()
+                assert response.status == 200 and "text/html" in response.getheader("Content-Type", ""), response.status
+                assert b"<!doctype html" in response.read().lower()
+            print("Fresh consumer passed: matching CLI, model check, SDK generation, explorer, HTTP 200 and modeled 400")
         finally:
             process.terminate()
             try:
