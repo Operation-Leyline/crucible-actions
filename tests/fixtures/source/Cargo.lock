@@ -1,0 +1,7 @@
+# A non-release commit with the same package version as v0.9.0.
+version = 4
+
+[[package]]
+name = "crucible-build"
+version = "0.9.0"
+source = "git+https://github.com/Operation-Leyline/crucible?rev=94cc7fe652d275c7008103cf7fecf9d5803e8180#94cc7fe652d275c7008103cf7fecf9d5803e8180"

@@ -1,20 +1,20 @@
 name: Check Crucible API compatibility
-description: Assemble and compare two Smithy source directories using a pinned Crucible checker.
+description: Compare two .cru packages and preserve a readable compatibility report.
 inputs:
   cli:
-    description: Absolute path to the Crucible executable.
-    required: true
+    description: Crucible executable; setup-crucible adds it to PATH.
+    default: crucible
   before:
-    description: Baseline Smithy directory (or JSON AST), relative to the workspace.
+    description: Baseline .cru package directory, relative to the workspace.
     required: true
   after:
-    description: Proposed Smithy directory (or JSON AST), relative to the workspace.
+    description: Proposed .cru package directory, relative to the workspace.
     required: true
   config:
     description: Compatibility policy path, relative to the workspace.
     default: crucible.toml
   service:
-    description: Absolute Smithy service ID when the model contains several services.
+    description: Fully qualified service ID when the package contains several services.
     default: ''
   report-path:
     description: Destination directory for the JSON and Markdown reports.

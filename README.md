@@ -1,96 +1,84 @@
 # crucible-actions
 
-Private shared GitHub Actions for Crucible services. API compatibility checks
-accept the Smithy directories from two revisions. Naming, path, and documentation
-rules remain build-time checks selected through `crucible-build`.
+Shared GitHub Actions for [Crucible](https://github.com/Operation-Leyline/crucible) services. Install the compiler your service uses, then run ordinary Crucible commands.
 
-## Comparing Smithy directories
+## Set up the CLI
 
-After checking out baseline and proposed revisions, run:
+Check out your service and add one step:
 
 ```yaml
-- uses: ./crucible-actions/api-diff
-  with:
-    cli: ${{ steps.tooling.outputs.cli }}
-    before: baseline/smithy
-    after: proposed/smithy
-    config: proposed/crucible.toml
+permissions:
+  contents: read
+
+steps:
+  - uses: actions/checkout@v4
+  - uses: Operation-Leyline/crucible-actions/setup-crucible@<pinned-sha>
+  - run: crucible check model
+  - run: crucible sdk generate
 ```
 
-`before`, `after`, and `config` are paths relative to `GITHUB_WORKSPACE`. They
-must stay within that workspace. JSON AST files are accepted in place of source
-directories. An optional `service` input selects a Smithy service ID.
+The last command needs a `crucible-sdk.toml` declaring your SDKs; omit it if you do not generate SDKs. See [SDK configuration](https://github.com/Operation-Leyline/crucible/blob/main/docs/sdk-packaging.md#1-declaring-sdks).
 
-The pinned Crucible CLI assembles both directories with its official Smithy
-compiler, imports bundled Crucible traits and errors, and flattens mixins before
-comparing the lowered APIs. Additional model dependencies must be present in
-those source directories. Compilation uses temporary directories outside the
-sources. No Cargo service build, lockfile, export script, or build command is
-needed. Missing sources, invalid Smithy, or invalid policy fail the job.
+Commit `Cargo.lock`. Setup finds it in the working directory or its nearest parent, stopping at the repository root. It reads the resolved Git commit for `crucible-build`, `crucible-server-runtime-rust`, or `crucible-client-runtime-rust`. Conflicting commits or versions fail with instructions to update them together. It never silently installs the latest compiler.
 
-The first assembly provisions a checksum-verified managed Java runtime; later
-runs reuse its cache. `SMITHY_TOOLING_CACHE` selects the cache directory and
-`SMITHY_OFFLINE=1` requires it to be populated. The checker revision must support
-Smithy-directory inputs; the initial AST-only implementation does not.
+When the package's release tag resolves to that exact commit, setup downloads a prebuilt CLI and verifies its SHA-256 checksum. Otherwise it builds the selected commit with Cargo. Both installations are cached, and `crucible` is on PATH in subsequent steps. The CLI's embedded revision is checked when present.
 
-## Private access across organizations
+Crucible and these actions are public. The default `github.token` handles API rate limits; no GitHub App, organization secrets, or extra checkout is required. Fork pull requests can use the same setup step.
 
-Copy [the caller template](templates/api-diff.yml) into your service repository.
-It uses the existing [crucible-ci-read App](https://github.com/apps/crucible-ci-read)
-to check out this private action repository, then invokes its composite actions
-locally. Both tooling repositories remain private.
+### Inputs and outputs
 
-Set repository variable `CRUCIBLE_APP_ID` (currently `5189718`) and secret
-`CRUCIBLE_APP_PRIVATE_KEY`. The App's Operation-Leyline installation must select
-`crucible` and `crucible-actions` with Contents: read. The caller may belong to
-another organization; token generation explicitly targets the Operation-Leyline
-installation. The App need not be installed on each consumer organization.
+| Input | Default | Use |
+|---|---|---|
+| `working-directory` | `.` | Where to start looking for `Cargo.lock`; workspace-relative or absolute |
+| `crucible-ref` | read `Cargo.lock` | Override with a release tag such as `v0.9.0` or a full 40-character commit |
+| `toolchain` | `stable` | Rust toolchain for a source build; prebuilt installation does not install Rust |
+| `token` | `github.token` | GitHub API and source checkout token |
 
-Checkout disables credential persistence. The token is short-lived and revoked
-at job completion. See the [token action documentation](https://github.com/actions/create-github-app-token)
-for scoping. Fork PRs cannot receive repository secrets.
+| Output | Meaning |
+|---|---|
+| `cli` | Absolute executable path, for callers that need it |
+| `revision` | Full selected Crucible commit |
 
-The template uses PR base/head SHAs. To preserve a released contract instead,
-set the baseline checkout's ref to that tag or commit. Pin the shared actions
-and checker independently to reviewed commits.
+A separate CLI-only job can select a release without a service checkout:
 
-## Reports and policy
+```yaml
+- uses: Operation-Leyline/crucible-actions/setup-crucible@<pinned-sha>
+  with:
+    crucible-ref: v0.9.0
+- run: crucible --version
+```
 
-The proposed `crucible.toml` selects compatibility severity, wire checks,
-model-level SDK symbol checks, and exact exceptions with reasons. Exceptions
-remain visible. See the [API policy reference](https://github.com/Operation-Leyline/crucible/blob/main/docs/api-policy.md).
+For a service nested under `backend/`, set `working-directory: backend`. Existing callers supplying `crucible-ref`, `toolchain`, `token`, and reading the `cli` output continue to work. Source builds reserve the `crucible-tooling/` directory in the workspace. Path dependencies, forks, and registry dependencies need an explicit `crucible-ref`.
 
-Wire checks cover Crucible JSON and AWS restJson1; unassessed features produce
-explicit `compatibility.unchecked` findings. SDK symbol checks are conservative
-model-level checks, not target-language ABI proofs.
+Supported prebuilt runners: Linux x64/arm64, macOS x64/arm64, Windows x64. Other runners build from source. Setup provisions Python 3.12; Bash is needed to run the composite steps. A source build also needs the native build tools for Rust. Service compilation and SDK consumer tests still need their own language toolchains.
 
-The job summary shows each finding. The `api-diff-report` artifact preserves
-JSON, Markdown, and checker diagnostics. Assembly/setup failures leave
-`failure.txt` when the action has started. Breaking findings retain a nonzero
-exit status. There is no first-run compatibility bypass.
+Pin the action to a reviewed commit independently of the Crucible dependency your service pins.
 
-## Tool setup and reusable workflow
+## API compatibility reports
 
-`setup-crucible` accepts `crucible-ref`, optional checkout `token`, and optional
-Rust `toolchain`; its `cli` output is the absolute executable path. Reserve the
-`crucible-tooling` checkout directory. Python 3.9+ and Bash are required for the
-composite action; the templates use Ubuntu runners.
+A `.cru` package with a configured frozen release baseline already checks compatibility during builds and `crucible check`. No separate comparison workflow is required for that guard. See [API releases](https://github.com/Operation-Leyline/crucible/blob/main/docs/api-policy.md#guarding-a-cru-package-against-its-last-release).
 
-The optional `.github/workflows/api-diff.yml` reusable workflow accepts a pinned
-checker ref, `smithy-path`, `config-path`, optional `service`, and `baseline-ref`
-(defaulting to the PR base SHA). It requires GitHub's native private workflow
-sharing. An App token cannot authorize remote reusable-workflow resolution;
-use the authenticated local-action caller template across organizations.
+Use `api-diff` when you also want a report comparing the PR base or another Git revision with the proposal. Copy [the caller template](templates/api-diff.yml), adjust the model paths, and pin its actions to reviewed commits:
+
+```yaml
+- uses: Operation-Leyline/crucible-actions/api-diff@<pinned-sha>
+  with:
+    before: baseline/model
+    after: service/model
+    config: service/model/crucible.toml
+```
+
+Run setup first. `before` and `after` are `.cru` packages, each with its own `crucible.toml`. Paths must stay inside `GITHUB_WORKSPACE`. Optional `service` selects a fully qualified service ID. `cli` defaults to `crucible`; `report-path` defaults to `api-diff-report`.
+
+The action writes JSON and Markdown reports and a job summary. Breaking findings remain failures; invalid models and setup errors never become a compatibility pass. The template uploads the reports even when comparison fails. Findings cover wire and model-level SDK compatibility, not every target language's ABI.
+
+The reusable `.github/workflows/api-diff.yml` provides the same checkout/comparison/report steps. Ordinary service CI should use the compiler's baseline guard; this workflow is optional.
 
 ## Validation
 
 ```sh
 python -m unittest discover -s tests -v
 CRUCIBLE_CLI=/absolute/path/to/crucible python -m unittest discover -s tests -v
-actionlint .github/workflows/api-diff.yml .github/workflows/ci.yml templates/api-diff.yml
 ```
 
-The real-checker test uses raw Smithy directories without a Cargo project,
-accepts identical models, rejects a changed HTTP path, and rejects malformed
-Smithy. Unit checks cover path containment, missing sources, visible exceptions,
-escaped summaries, and preserving failing reports.
+CI installs the released CLI on Linux, macOS, and Windows, creates a fresh service, runs setup again using only its lockfile, checks the model, generates an SDK, builds the service, and verifies HTTP 200 and modeled 400 responses. Real compatibility tests accept identical `.cru` packages and reject an HTTP route change and malformed sources. A separate Linux job checks automatic installation of a non-release commit from source. Unit tests cover conflicting pins, checksum failures, archive handling, and credential redirects.

@@ -1,4 +1,4 @@
-"""Compare two Smithy directories and preserve Crucible's compatibility report."""
+"""Compare two Crucible packages and preserve the compatibility report."""
 
 import argparse
 import html
@@ -46,7 +46,7 @@ def run(args):
     after = inside(workspace, args.after)
     for path in (before, after):
         if not path.is_dir() and not path.is_file():
-            raise ValueError(f"Missing Smithy directory or JSON model: {path}")
+            raise ValueError(f"Missing Crucible package: {path}")
     config = inside(workspace, args.config)
     if not config.is_file():
         raise ValueError(f"Missing policy: {config}")

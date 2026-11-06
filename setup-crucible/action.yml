@@ -1,43 +1,87 @@
 name: Set up Crucible
-description: Build a pinned Crucible CLI with a cached Rust toolchain and dependencies.
+description: Install the CLI matching Cargo.lock, cache it, and add crucible to PATH.
 inputs:
   crucible-ref:
-    description: Immutable Crucible commit or release tag containing the policy checker.
-    required: true
+    description: Override automatic Cargo.lock selection with a release tag or full commit.
+    default: ''
+  working-directory:
+    description: Consumer directory in which to find Cargo.lock (also searches its parents).
+    default: '.'
   token:
-    description: Read token for the private Crucible repository.
+    description: GitHub API token; no App credentials are needed for public Crucible tooling.
     default: ${{ github.token }}
   toolchain:
-    description: Rust toolchain used to build the checker.
+    description: Rust toolchain for a source build when no matching prebuilt CLI exists.
     default: stable
 outputs:
   cli:
-    description: Absolute path to the compiled Crucible CLI.
-    value: ${{ steps.build.outputs.cli }}
+    description: Absolute executable path; crucible is also on PATH for later steps.
+    value: ${{ steps.finish.outputs.cli }}
+  revision:
+    description: The full Crucible commit selected for this installation.
+    value: ${{ steps.pin.outputs.revision }}
 runs:
   using: composite
   steps:
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: '3.12'
+    - id: pin
+      shell: bash
+      env:
+        SETUP_SCRIPT: ${{ github.action_path }}/setup.py
+        CRUCIBLE_REF: ${{ inputs.crucible-ref }}
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        TOOLCHAIN: ${{ inputs.toolchain }}
+        GH_TOKEN: ${{ inputs.token }}
+      run: python "$SETUP_SCRIPT" resolve
+    - id: cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.pin.outputs.root }}
+        key: ${{ steps.pin.outputs.cache-key }}
+    - id: download
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        SETUP_SCRIPT: ${{ github.action_path }}/setup.py
+        RELEASE: ${{ steps.pin.outputs.release }}
+        TARGET: ${{ steps.pin.outputs.target }}
+        INSTALL_ROOT: ${{ steps.pin.outputs.root }}
+      run: python "$SETUP_SCRIPT" download
     - uses: actions/checkout@v4
+      if: steps.cache.outputs.cache-hit != 'true' && steps.download.outputs.installed != 'true'
       with:
         repository: Operation-Leyline/crucible
-        ref: ${{ inputs.crucible-ref }}
+        ref: ${{ steps.pin.outputs.revision }}
         token: ${{ inputs.token }}
         path: crucible-tooling
         persist-credentials: false
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
+      if: steps.cache.outputs.cache-hit != 'true' && steps.download.outputs.installed != 'true'
       with:
         toolchain: ${{ inputs.toolchain }}
     - uses: Swatinem/rust-cache@v2
+      if: steps.cache.outputs.cache-hit != 'true' && steps.download.outputs.installed != 'true'
       with:
         workspaces: crucible-tooling -> target
     - id: build
+      if: steps.cache.outputs.cache-hit != 'true' && steps.download.outputs.installed != 'true'
       shell: bash
       run: |
         cargo build --manifest-path "$GITHUB_WORKSPACE/crucible-tooling/Cargo.toml" \
           --locked -p crucible-cli
         binary=crucible
         if [[ "$RUNNER_OS" == Windows ]]; then binary=crucible.exe; fi
-        printf 'cli=%s\n' "$GITHUB_WORKSPACE/crucible-tooling/target/debug/$binary" >> "$GITHUB_OUTPUT"
+        printf 'binary=%s\n' "$GITHUB_WORKSPACE/crucible-tooling/target/debug/$binary" >> "$GITHUB_OUTPUT"
       env:
         CARGO_BUILD_JOBS: '2'
         CARGO_TARGET_DIR: ${{ github.workspace }}/crucible-tooling/target
+    - id: finish
+      shell: bash
+      env:
+        SETUP_SCRIPT: ${{ github.action_path }}/setup.py
+        INSTALL_ROOT: ${{ steps.pin.outputs.root }}
+        REVISION: ${{ steps.pin.outputs.revision }}
+        SOURCE_BINARY: ${{ steps.build.outputs.binary }}
+      run: python "$SETUP_SCRIPT" finish
