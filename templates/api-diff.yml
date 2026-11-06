@@ -22,14 +22,13 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha }}
           path: baseline
           persist-credentials: false
-      - uses: Operation-Leyline/crucible-actions/setup-crucible@50bd6f83a989e9ebe49e6cb3a56e6f22698bd66d
+      - uses: Operation-Leyline/crucible-actions/setup-crucible@4e2aa84e2f91beb18821932e7a1a2cc125823a98
         with:
           working-directory: service
-      - uses: Operation-Leyline/crucible-actions/api-diff@50bd6f83a989e9ebe49e6cb3a56e6f22698bd66d
+      - uses: Operation-Leyline/crucible-actions/api-diff@4e2aa84e2f91beb18821932e7a1a2cc125823a98
         with:
           before: baseline/model
           after: service/model
-          config: service/model/crucible.toml
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -20,8 +20,8 @@ on:
         default: model
         type: string
       config-path:
-        description: Policy path relative to the proposed checkout.
-        default: model/crucible.toml
+        description: Optional policy path relative to the proposed checkout; otherwise use the model package's manifest.
+        default: ''
         type: string
       service:
         description: Fully qualified service ID when there is more than one service.
@@ -65,19 +65,17 @@ jobs:
           ref: ${{ steps.baseline.outputs.ref }}
           path: baseline
           persist-credentials: false
-      - uses: Operation-Leyline/crucible-actions/setup-crucible@50bd6f83a989e9ebe49e6cb3a56e6f22698bd66d
-        id: tooling
+      - uses: Operation-Leyline/crucible-actions/setup-crucible@4e2aa84e2f91beb18821932e7a1a2cc125823a98
         with:
           crucible-ref: ${{ inputs.crucible-ref }}
           working-directory: service
           token: ${{ secrets.CRUCIBLE_READ_TOKEN || github.token }}
-      - uses: Operation-Leyline/crucible-actions/api-diff@50bd6f83a989e9ebe49e6cb3a56e6f22698bd66d
+      - uses: Operation-Leyline/crucible-actions/api-diff@4e2aa84e2f91beb18821932e7a1a2cc125823a98
         id: diff
         with:
-          cli: ${{ steps.tooling.outputs.cli }}
           before: baseline/${{ inputs.smithy-path || inputs.model-path }}
           after: service/${{ inputs.smithy-path || inputs.model-path }}
-          config: service/${{ inputs.config-path }}
+          config: ${{ inputs.config-path && format('service/{0}', inputs.config-path) || '' }}
           service: ${{ inputs.service }}
       - uses: actions/upload-artifact@v4
         if: always()
