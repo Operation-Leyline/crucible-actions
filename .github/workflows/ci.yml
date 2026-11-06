@@ -28,3 +28,69 @@ jobs:
           tar -xzf "$archive" -C "$RUNNER_TEMP/actionlint"
           "$RUNNER_TEMP/actionlint/actionlint" -shellcheck= -pyflakes= \
             .github/workflows/api-diff.yml .github/workflows/ci.yml templates/api-diff.yml
+  consumer:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      CARGO_BUILD_JOBS: '2'
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - uses: ./setup-crucible
+        with: { crucible-ref: v0.9.0 }
+      - name: Verify the documented Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          CRUCIBLE_CLI_UNMANAGED_INSTALL: ${{ runner.temp }}/documented-installer
+          CRUCIBLE_CLI_NO_MODIFY_PATH: '1'
+        run: |
+          Invoke-RestMethod https://github.com/Operation-Leyline/crucible/releases/download/v0.9.0/crucible-cli-installer.ps1 | Invoke-Expression
+          & "$env:CRUCIBLE_CLI_UNMANAGED_INSTALL/crucible.exe" --version
+      - name: Verify the documented macOS and Linux installer
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          CRUCIBLE_CLI_UNMANAGED_INSTALL: ${{ runner.temp }}/documented-installer
+          CRUCIBLE_CLI_NO_MODIFY_PATH: '1'
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Operation-Leyline/crucible/releases/download/v0.9.0/crucible-cli-installer.sh | sh
+          "$CRUCIBLE_CLI_UNMANAGED_INSTALL/crucible" --version
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
+      - name: Create a fresh consumer with the installed CLI
+        shell: bash
+        run: python tests/consumer.py prepare "$RUNNER_TEMP/hello service"
+      # No input, token or version-parsing wrapper: the documented consumer step.
+      - uses: ./setup-crucible
+        id: consumer
+        with: { working-directory: '${{ runner.temp }}/hello service' }
+      - name: Verify the real CLI and compatibility reports
+        env:
+          CRUCIBLE_CLI: ${{ steps.consumer.outputs.cli }}
+        run: python -m unittest discover -s tests -v
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ runner.temp }}/hello service -> target
+      - name: Build and call the independent service
+        shell: bash
+        run: python tests/consumer.py verify "$RUNNER_TEMP/hello service"
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - uses: ./setup-crucible
+        id: source
+        with:
+          # The package version matches v0.9.0, but its locked commit does not.
+          working-directory: tests/fixtures/source
+      - run: crucible --version
+      - run: python -m unittest discover -s tests -v
+        env:
+          CRUCIBLE_CLI: ${{ steps.source.outputs.cli }}

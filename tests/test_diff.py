@@ -25,14 +25,14 @@ class DiffTests(unittest.TestCase):
 
     def test_missing_sources_fail_instead_of_skipping(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             with patch.dict(os.environ, {"GITHUB_WORKSPACE": str(root)}, clear=True), patch.object(api_diff.subprocess, "run") as run:
                 self.assertRaises(ValueError, api_diff.run, self.args(root))
                 run.assert_not_called()
 
     def test_breaking_report_is_preserved_and_returns_the_checker_failure(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             for side in ("baseline", "proposed"):
                 (root / side).mkdir()
                 (root / side / "model.json").write_text("{}", encoding="utf-8")
@@ -51,28 +51,30 @@ class DiffTests(unittest.TestCase):
 
     @unittest.skipUnless(os.environ.get("CRUCIBLE_CLI"), "Set CRUCIBLE_CLI to exercise the real checker")
     def test_real_checker_accepts_identity_and_rejects_an_http_break(self):
-        model = '''$version: "2"
-namespace example.api
-use crucible.protocols#json
-@json
-service Example { version: "1", operations: [GetItem] }
-@http(method: "GET", uri: "/v1/items", code: 200)
-operation GetItem { output: GetItemOutput }
-@output
-structure GetItemOutput { @required name: String }
+        model = '''service Example {
+    version "1"
+    protocol json
+    operations [GetItem]
+}
+readonly operation GetItem {
+    http GET "/v1/items" -> 200
+    output { name: string }
+}
 '''
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             for side in ("baseline", "proposed"):
                 (root / side).mkdir()
-                (root / side / "api.smithy").write_text(model, encoding="utf-8")
-            (root / "proposed/crucible.toml").write_text("schema_version = 1", encoding="utf-8")
+                (root / side / "api.cru").write_text(model, encoding="utf-8")
+                (root / side / "crucible.toml").write_text('schema_version = 1\n[model]\nnamespace = "example.api"\nlanguage = 1\nsources = ["."]\nimports = []\n', encoding="utf-8")
             args = self.args(root, os.environ["CRUCIBLE_CLI"])
+            # The two required package inputs also select the proposed package's policy.
+            args.config = ""
             with patch.dict(os.environ, {"GITHUB_WORKSPACE": str(root)}):
                 self.assertEqual(api_diff.run(args), 0)
-                (root / "proposed/api.smithy").write_text(model.replace("/v1/items", "/v2/items"), encoding="utf-8")
+                (root / "proposed/api.cru").write_text(model.replace("/v1/items", "/v2/items"), encoding="utf-8")
                 self.assertEqual(api_diff.run(args), 1)
-                (root / "proposed/api.smithy").write_text("not a Smithy model", encoding="utf-8")
+                (root / "proposed/api.cru").write_text("not a Crucible model", encoding="utf-8")
                 self.assertRaises(ValueError, api_diff.run, args)
 
 
