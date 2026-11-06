@@ -52,6 +52,16 @@ class SetupTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "No Cargo.lock"):
                 setup.locked(nested)
 
+    def test_client_only_project_uses_its_runtime_pin(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lock(root, [("crucible-client-runtime-rust", "0.9.0", git())])
+            self.assertEqual(setup.locked(root), (A, "v0.9.0"))
+            lock(root, [("crucible-client-runtime-rust", "0.9.0", git()),
+                        ("crucible-client-runtime-rust", "0.8.0", git(B))])
+            with self.assertRaisesRegex(ValueError, "multiple Crucible"):
+                setup.locked(root)
+
     def test_conflicting_revisions_versions_and_source_types_fail(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

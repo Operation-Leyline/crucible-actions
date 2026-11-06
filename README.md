@@ -19,7 +19,7 @@ steps:
 
 The last command needs a `crucible-sdk.toml` declaring your SDKs; omit it if you do not generate SDKs. See [SDK configuration](https://github.com/Operation-Leyline/crucible/blob/main/docs/sdk-packaging.md#1-declaring-sdks).
 
-Commit `Cargo.lock`. Setup finds it in the working directory or its nearest parent, stopping at the repository root. It reads the resolved Git commit for `crucible-build` and `crucible-server-runtime-rust`, matching the compiler check in `crucible sdk`. Conflicting compiler/server commits or versions fail with instructions to update them together. Older SDK client-runtime dependencies do not change this selection. It never silently installs the latest compiler.
+Commit `Cargo.lock`. Setup finds it in the working directory or its nearest parent, stopping at the repository root. It reads the resolved Git commit for `crucible-build` and `crucible-server-runtime-rust`, matching the compiler check in `crucible sdk`. Conflicting compiler/server commits or versions fail with instructions to update them together. Older SDK client-runtime dependencies do not change this selection. A client-only project with neither package can use its `crucible-client-runtime-rust` pin instead. Setup never silently installs the latest compiler.
 
 When the package's release tag resolves to that exact commit, setup downloads a prebuilt CLI and verifies its SHA-256 checksum. Otherwise it builds the selected commit with Cargo. Both installations are cached, and `crucible` is on PATH in subsequent steps. The CLI's embedded revision is checked when present.
 

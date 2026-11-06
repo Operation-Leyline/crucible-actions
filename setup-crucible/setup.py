@@ -71,7 +71,8 @@ def locked(root):
         if lock.is_file():
             with lock.open("rb") as source:
                 packages = tomllib.load(source).get("package", [])
-            packages = [p for p in packages if p.get("name") in PINNED]
+            primary = [p for p in packages if p.get("name") in PINNED]
+            packages = primary or [p for p in packages if p.get("name") == "crucible-client-runtime-rust"]
             if not packages:
                 raise ValueError(f"{lock} has no Crucible dependency; set crucible-ref to a release tag or full commit")
             pins = set()
