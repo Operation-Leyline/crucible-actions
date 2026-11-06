@@ -1,6 +1,7 @@
 """Exercise the documented onboarding flow from an independent consumer."""
 
 import argparse
+from contextlib import closing
 import http.client
 import json
 import os
@@ -68,7 +69,7 @@ def verify(root):
             status, error = request(endpoint, b"{}")
             assert status == 400 and error["__type"] == "ValidationException", (status, error)
             address = urlsplit(endpoint)
-            with http.client.HTTPConnection(address.hostname, address.port, timeout=10) as connection:
+            with closing(http.client.HTTPConnection(address.hostname, address.port, timeout=10)) as connection:
                 connection.request("GET", "/explorer/")
                 response = connection.getresponse()
                 assert response.status == 200 and "text/html" in response.getheader("Content-Type", ""), response.status
