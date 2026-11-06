@@ -38,7 +38,8 @@ class SetupTests(unittest.TestCase):
             nested = root / "service"
             nested.mkdir()
             (root / ".git").write_text("gitdir: elsewhere")
-            lock(root, [("crucible-build", "0.9.0", git()), ("crucible-server-runtime-rust", "0.9.0", git())])
+            lock(root, [("crucible-build", "0.9.0", git()), ("crucible-server-runtime-rust", "0.9.0", git()),
+                        ("crucible-client-runtime-rust", "0.8.0", git(B))])
             self.assertEqual(setup.locked(nested), (A, "v0.9.0"))
 
     def test_missing_lock_does_not_select_a_parent_repository_or_latest(self):

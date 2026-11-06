@@ -17,7 +17,9 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 import zipfile
 
 REPOSITORY = "Operation-Leyline/crucible"
-PINNED = {"crucible-build", "crucible-server-runtime-rust", "crucible-client-runtime-rust"}
+# Match `crucible sdk`'s compiler check. A consumer of an older SDK can
+# legitimately bring an older client runtime into the same lockfile.
+PINNED = {"crucible-build", "crucible-server-runtime-rust"}
 COMMIT = re.compile(r"[0-9a-f]{40}")
 TAG = re.compile(r"v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?")
 
