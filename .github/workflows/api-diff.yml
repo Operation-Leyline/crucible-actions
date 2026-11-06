@@ -65,12 +65,12 @@ jobs:
           ref: ${{ steps.baseline.outputs.ref }}
           path: baseline
           persist-credentials: false
-      - uses: Operation-Leyline/crucible-actions/setup-crucible@4d0ee1e011a0c42f2d36de4c0abbb23501c38f39
+      - uses: Operation-Leyline/crucible-actions/setup-crucible@a455740f063965b4b7fd96a0591e77db0f466409
         with:
           crucible-ref: ${{ inputs.crucible-ref }}
           working-directory: service
           token: ${{ secrets.CRUCIBLE_READ_TOKEN || github.token }}
-      - uses: Operation-Leyline/crucible-actions/api-diff@4d0ee1e011a0c42f2d36de4c0abbb23501c38f39
+      - uses: Operation-Leyline/crucible-actions/api-diff@a455740f063965b4b7fd96a0591e77db0f466409
         id: diff
         with:
           before: baseline/${{ inputs.smithy-path || inputs.model-path }}
